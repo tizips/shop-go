@@ -36,4 +36,4 @@ COPY --from=builder /build/queue/conf ./conf
 EXPOSE 9600
 
 # Command to run the executable
-CMD ["/app/application", "server"]
+CMD ["/app/application", "consumer"]

@@ -57,6 +57,21 @@ func ShopRouter(router *server.Hertz) {
 		order := route.Group("order").Use(middleware.Auth())
 		{
 			order.POST("", shop.DoOrder)
+			order.POST("received", shop.DoOrderOfReceived)
+			order.POST("service", shop.DoOrderOfService)
+		}
+
+		services := route.Group("services").Use(middleware.Auth())
+		{
+			services.GET("", shop.ToServiceOfPaginate)
+			services.GET(":id", shop.ToServiceOfInformation)
+			services.DELETE(":id", shop.DoServiceOfCancel)
+		}
+
+		service := route.Group("service").Use(middleware.Auth())
+		{
+			service.POST("shipment", shop.DoServiceOfShipment)
+			service.POST("finish", shop.DoServiceOfFinish)
 		}
 
 		payment := route.Group("payment").Use(middleware.Auth())
@@ -99,6 +114,17 @@ func ShopRouter(router *server.Hertz) {
 		wishlist := route.Group("wishlist")
 		{
 			wishlist.POST("", shop.DoWishlistOfCreate)
+		}
+
+		appraisals := route.Group("appraisals").Use(middleware.Auth())
+		{
+			appraisals.GET("", shop.ToAppraisalOfPaginate)
+			appraisals.DELETE(":id", shop.DoAppraisalOfDelete)
+		}
+
+		appraisal := route.Group("appraisal").Use(middleware.Auth())
+		{
+			appraisal.POST("", shop.DoAppraisalOfCreate)
 		}
 
 		seo := route.Group("seo")

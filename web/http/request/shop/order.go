@@ -31,15 +31,18 @@ type ToOrderOfInformation struct {
 	request.IDOfSnowflake
 }
 
+type DoOrderOfReceived struct {
+	request.IDOfSnowflake
+}
+
 type DoOrderOfCompleted struct {
 	request.IDOfSnowflake
 }
 
 type DoOrderOfService struct {
 	ID       string                       `json:"id" form:"id" valid:"required,snowflake" label:"订单号"`
-	Detail   string                       `json:"detail" form:"detail" valid:"omitempty,snowflake" label:"明细ID"`
-	Details  []DoOrderOfServiceWithDetail `json:"details" form:"details[]" valid:"omitempty,unique=ID,dive" label:"明细列表"`
 	Type     string                       `json:"type" form:"type" valid:"required,oneof=un_receipt refund exchange" label:"类型"`
+	Details  []DoOrderOfServiceWithDetail `json:"details" form:"details[]" valid:"omitempty,unique=ID,dive" label:"明细列表"`
 	Reason   string                       `json:"reason" form:"reason" valid:"omitempty,max=255" label:"原因"`
 	Pictures []string                     `json:"pictures" form:"pictures[]" valid:"omitempty,max=8,unique,dive,max=255,http_url" label:"图片"`
 }

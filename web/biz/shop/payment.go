@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/herhe-com/framework/auth"
 	"github.com/herhe-com/framework/database/gorm/scope"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
-	"github.com/smartwalle/paypal"
+	"github.com/plutov/paypal/v4"
+	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"project.io/shop/model"
 	req "project.io/shop/web/http/request/shop"
@@ -48,61 +48,76 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 
 	facades.Gorm.Scopes(scope.Platform(ctx)).Find(&details, "`order_id`=?", payment.OrderID)
 
-	client := paypal.New(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), facades.Cfg.GetBool("payment.paypal.live"))
+	base := lo.If(facades.Cfg.GetBool("payment.paypal.debug"), paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
 
-	information := &paypal.Payment{
-		Intent: paypal.PaymentIntentSale,
-		Payer: &paypal.Payer{
-			PaymentMethod: "paypal",
-			PayerInfo: &paypal.PayerInfo{
-				Email:     address.Email,
-				FirstName: address.FirstName,
-				LastName:  address.LastName,
-			},
-		},
-		RedirectURLs: &paypal.RedirectURLs{
-			ReturnURL: facades.Cfg.GetString("payment.paypal.url.return"),
-			CancelURL: facades.Cfg.GetString("payment.paypal.url.cancel"),
-		},
+	client, err := paypal.NewClient(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), base)
+
+	if err != nil {
+		http.Fail(ctx, "Payment initiation failed. Please try again later.")
+		return
 	}
 
-	transaction := &paypal.Transaction{
-		ReferenceId: "",
-		Amount: &paypal.Amount{
-			Total:    strconv.FormatFloat(float64(payment.Money)/100, 'f', 2, 64),
+	unit := paypal.PurchaseUnitRequest{
+		Amount: &paypal.PurchaseUnitAmount{
 			Currency: "USD",
-			Details: &paypal.AmountDetails{
-				Subtotal: strconv.FormatFloat(float64(payment.Order.TotalPrice)/100, 'f', 2, 64),
-				Shipping: strconv.FormatFloat(float64(payment.Order.CostShipping)/100, 'f', 2, 64),
+			Value:    strconv.FormatFloat(float64(payment.Money)/100, 'f', 2, 64),
+			Breakdown: &paypal.PurchaseUnitAmountBreakdown{
+				ItemTotal: &paypal.Money{
+					Currency: "USD",
+					Value:    strconv.FormatFloat(float64(payment.Order.TotalPrice)/100, 'f', 2, 64),
+				},
+				Shipping: &paypal.Money{
+					Currency: "USD",
+					Value:    strconv.FormatFloat(float64(payment.Order.CostShipping)/100, 'f', 2, 64),
+				},
 			},
 		},
-		InvoiceNumber: payment.ID,
-		ItemList: &paypal.ItemList{
-			Items: make([]*paypal.Item, len(details)),
-		},
+		InvoiceID: payment.ID,
+		Items:     make([]paypal.Item, len(details)),
 	}
 
 	for idx, item := range details {
-		transaction.ItemList.Items[idx] = &paypal.Item{
-			Name:     item.Name,
-			Price:    strconv.FormatFloat(float64(item.Price)/100, 'f', 2, 64),
-			Currency: "USD",
+		unit.Items[idx] = paypal.Item{
+			Name: lo.If(lo.RuneLength(item.Name) > 120, lo.Substring(item.Name, 0, 117)+"...").Else(item.Name),
+			UnitAmount: &paypal.Money{
+				Currency: "USD",
+				Value:    strconv.FormatFloat(float64(item.Price)/100, 'f', 2, 64),
+			},
 			Quantity: fmt.Sprintf("%v", item.Quantity),
 			SKU:      strings.Join(item.Specifications, ";"),
 		}
 	}
 
-	information.Transactions = []*paypal.Transaction{transaction}
+	units := []paypal.PurchaseUnitRequest{unit}
+	source := &paypal.PaymentSource{
+		Paypal: &paypal.PaymentSourcePaypal{
+			ExperienceContext: paypal.PaymentSourcePaypalExperienceContext{
+				PaymentMethodPreference: "UNRESTRICTED",
+				BrandName:               facades.Cfg.GetString("app.title"),
+				Locale:                  "en-US",
+				LandingPage:             "LOGIN",
+				ShippingPreference:      "NO_SHIPPING",
+				UserAction:              "PAY_NOW",
+				ReturnURL:               facades.Cfg.GetString("payment.paypal.url.return"),
+				CancelURL:               facades.Cfg.GetString("payment.paypal.url.cancel"),
+			},
+		},
+	}
+	appCtx := &paypal.ApplicationContext{}
 
-	order, err := client.CreatePayment(information)
+	order, err := client.CreateOrder(c, paypal.OrderIntentCapture, units, source, appCtx)
 
 	if err != nil {
-		spew.Dump(err.Error())
 		http.Fail(ctx, "Payment initiation failed. Please try again later.")
 		return
 	}
 
-	if result := facades.Gorm.Model(&payment).Update("no", order.Id); result.Error != nil {
+	updates := map[string]any{
+		"no":       order.ID,
+		"currency": "USD",
+	}
+
+	if result := facades.Gorm.Model(&payment).Updates(updates); result.Error != nil {
 		http.Fail(ctx, "Payment initiation failed. Please try again later.")
 		return
 	}
@@ -110,7 +125,7 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 	responses := shop.DoPaymentOfPaypal{}
 
 	for _, item := range order.Links {
-		if item.Rel == "approval_url" {
+		if item.Rel == "payer-action" {
 			responses.Link = item.Href
 			break
 		}

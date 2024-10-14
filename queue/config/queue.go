@@ -25,6 +25,7 @@ func init() {
 			shop.OrderPaid,
 			shop.OrderRefund,
 			shop.OrderClosed,
+			shop.OrderReceived,
 			shop.OrderCompleted,
 			shop.OrderLog,
 			shop.ServiceAgree,

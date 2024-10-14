@@ -7,6 +7,7 @@ import (
 	sBasic "project.io/shop/admin/biz/shop/store/basic"
 	sCommodity "project.io/shop/admin/biz/shop/store/commodity"
 	sMember "project.io/shop/admin/biz/shop/store/member"
+	sOrder "project.io/shop/admin/biz/shop/store/order"
 )
 
 func ShopRouter(router *server.Hertz) {
@@ -45,6 +46,42 @@ func ShopRouter(router *server.Hertz) {
 
 		sto := route.Group("store")
 		{
+			order := sto.Group("order")
+			{
+				ordinaries := order.Group("ordinaries")
+				{
+					ordinaries.GET(":id", sOrder.ToOrdinaryOfInformation)
+					ordinaries.GET("", middleware.Permission("shop.order.ordinary.paginate"), sOrder.ToOrdinaryOfPaginate)
+				}
+
+				ordinary := order.Group("ordinary")
+				{
+					ordinary.POST("shipment", middleware.Permission("shop.order.ordinary.shipment"), sOrder.DoOrdinaryOfShipment)
+					ordinary.POST("remark", sOrder.DoOrdinaryOfRemark)
+					ordinary.GET("address", sOrder.ToOrdinaryOfAddress)
+					ordinary.GET("logs", sOrder.ToOrdinaryOfLogs)
+				}
+
+				services := order.Group("services")
+				{
+					services.GET("", middleware.Permission("shop.order.service.paginate"), sOrder.ToServiceOfPaginate)
+				}
+
+				service := order.Group("service")
+				{
+					service.GET("logs", sOrder.ToServiceOfLogs)
+					service.POST("handle", middleware.Permission("shop.order.service.handle"), sOrder.DoServiceOfHandle)
+					service.POST("shipment", middleware.Permission("shop.order.service.handle"), sOrder.DoServiceOfShipment)
+					service.POST("finish", middleware.Permission("shop.order.service.handle"), sOrder.DoServiceOfFinish)
+					service.POST("closed", middleware.Permission("shop.order.service.handle"), sOrder.DoServiceOfClosed)
+				}
+
+				appraisals := order.Group("appraisals")
+				{
+					appraisals.GET("", middleware.Permission("shop.order.appraisal.paginate"), sOrder.ToAppraisalOfPaginate)
+				}
+			}
+
 			commodity := sto.Group("commodity")
 			{
 

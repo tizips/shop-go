@@ -3,6 +3,7 @@ package shop
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/golang-module/carbon/v2"
 	"github.com/herhe-com/framework/auth"
@@ -253,6 +254,7 @@ func DoOrder(c context.Context, ctx *app.RequestContext) {
 	}
 
 	responses := res.DoOrder{
+		ID:      order.ID,
 		PayID:   payment.ID,
 		Channel: request.Payment,
 	}
@@ -360,14 +362,16 @@ func ToOrderOfInformation(c context.Context, ctx *app.RequestContext) {
 	var order model.ShpOrder
 
 	fo := facades.Gorm.
-		//Preload("Organization", func(t *gorm.DB) *gorm.DB { return t.Unscoped() }).
 		Preload("Details").
 		Preload("Address").
 		Preload("Payment").
 		//Preload("Invoice").
-		//Preload("Shipment").
-		//Preload("Shipping").
-		//Preload("Services.Products").
+		Preload("Shipment").
+		Preload("Services", func(t *gorm.DB) *gorm.DB {
+			return t.
+				Preload("Products").
+				Where("`status` NOT IN (?)", []string{model.ShpServiceOfStatusFinish, model.ShpServiceOfStatusClosed})
+		}).
 		Preload("Logs", func(t *gorm.DB) *gorm.DB { return t.Order("`id` desc") }).
 		First(&order, "`id`=? and `user_id`=?", request.ID, auth.ID(ctx))
 
@@ -390,24 +394,11 @@ func ToOrderOfInformation(c context.Context, ctx *app.RequestContext) {
 		Remark:       order.Remark,
 		IsInvoice:    order.IsInvoice,
 		IsAppraisal:  order.IsAppraisal,
-		CanService:   util.No,
 		CreateAt:     order.CreatedAt.ToDateTimeString(),
 	}
 
-	now := carbon.Now()
-
-	if order.CompletedAt != nil && order.CompletedAt.AddDays(7).Gt(now) {
-		responses.CanService = util.Yes
-	}
-
-	//if order.Organization != nil {
-	//	responses.Organization = res.ToOrderOfOrganization{
-	//		ID:   order.Organization.ID,
-	//		Name: order.Organization.Name,
-	//	}
-	//}
-
 	if order.Payment != nil {
+
 		responses.Payment = &res.ToOrderOfPayment{
 			ID:      order.Payment.ID,
 			Channel: order.Payment.Channel,
@@ -422,9 +413,9 @@ func ToOrderOfInformation(c context.Context, ctx *app.RequestContext) {
 		}
 	}
 
-	//if order.Shipping != nil {
-	//	responses.Shipping = order.Shipping.Name
-	//}
+	if order.Shipment != nil {
+		responses.Shipping = order.Shipment.Company
+	}
 
 	if order.Address != nil {
 		responses.Address = res.ToOrderOfAddress{
@@ -491,53 +482,323 @@ func ToOrderOfInformation(c context.Context, ctx *app.RequestContext) {
 		}
 	}
 
-	//if order.Shipment != nil {
-	//
-	//	responses.Shipment = &res.ToOrderOfShipment{
-	//		Company:   order.Shipment.Company,
-	//		No:        order.Shipment.No,
-	//		Remark:    order.Shipment.Remark,
-	//		CreatedAt: order.Shipment.CreatedAt.ToDateTimeString(),
-	//	}
-	//}
-	//
-	//if len(order.Services) > 0 {
-	//
-	//	responses.Services = make([]res.ToOrderOfService, len(order.Services))
-	//
-	//	for idx, item := range responses.Details {
-	//
-	//		for _, val := range order.Services {
-	//
-	//			if lo.ContainsBy(val.Products, func(val model.ShpServiceProduct) bool { return item.ID == val.DetailID }) {
-	//
-	//				responses.Details[idx].IsServiced = util.Yes
-	//
-	//				if val.Status != model.ShpServiceOfStatusFinish && val.Status != model.ShpServiceOfStatusClosed {
-	//					responses.Details[idx].Service = &val.ID
-	//				}
-	//			}
-	//		}
-	//	}
-	//
-	//	for idx, item := range order.Services {
-	//
-	//		responses.Services[idx] = res.ToOrderOfService{
-	//			ID:     item.ID,
-	//			Type:   item.Type,
-	//			Status: item.Status,
-	//			Detail: item.DetailID,
-	//			Reason: item.Reason,
-	//			Details: lo.Map(item.Products, func(val model.ShpServiceProduct, index int) res.ToOrderOfServiceWithDetail {
-	//				return res.ToOrderOfServiceWithDetail{
-	//					ID:       val.DetailID,
-	//					Quantity: val.Quantity,
-	//				}
-	//			}),
-	//			CreatedAt: item.CreatedAt.ToDateTimeString(),
-	//		}
-	//	}
-	//}
+	if order.Shipment != nil {
+
+		responses.Shipment = &res.ToOrderOfShipment{
+			Company:   order.Shipment.Company,
+			No:        order.Shipment.No,
+			Remark:    order.Shipment.Remark,
+			CreatedAt: order.Shipment.CreatedAt.ToDateTimeString(),
+		}
+	}
+
+	if len(order.Services) > 0 {
+
+		responses.Services = make([]res.ToOrderOfService, len(order.Services))
+
+		for idx, item := range responses.Details {
+
+			for _, val := range order.Services {
+
+				for _, v := range val.Products {
+
+					if item.ID == v.DetailID {
+						if responses.Details[idx].Service == nil {
+							responses.Details[idx].Service = &val.ID
+						}
+						responses.Details[idx].Services += v.Quantity
+					}
+				}
+			}
+		}
+
+		for idx, item := range order.Services {
+
+			responses.Services[idx] = res.ToOrderOfService{
+				ID:     item.ID,
+				Type:   item.Type,
+				Status: item.Status,
+				Detail: item.DetailID,
+				Reason: item.Reason,
+				Details: lo.Map(item.Products, func(val model.ShpServiceDetail, index int) res.ToOrderOfServiceWithDetail {
+					return res.ToOrderOfServiceWithDetail{
+						ID:       val.DetailID,
+						Quantity: val.Quantity,
+					}
+				}),
+				CreatedAt: item.CreatedAt.ToDateTimeString(),
+			}
+		}
+	}
 
 	http.Success(ctx, responses)
+}
+
+func DoOrderOfReceived(c context.Context, ctx *app.RequestContext) {
+
+	var request req.DoOrderOfReceived
+
+	if err := ctx.BindAndValidate(&request); err != nil {
+		http.BadRequest(ctx, err)
+		return
+	}
+
+	var order model.ShpOrder
+
+	fo := facades.Gorm.First(&order, "`id`=? and `user_id`=?", request.ID, auth.ID(ctx))
+
+	if errors.Is(fo.Error, gorm.ErrRecordNotFound) {
+		http.NotFound(ctx, "Order not found.")
+		return
+	} else if fo.Error != nil {
+		http.Fail(ctx, "Order query failed. Please try again later.")
+		return
+	}
+
+	if order.Status != model.ShpOrderOfStatusReceipt {
+		http.Fail(ctx, "Order status is abnormal. Please try again later.")
+		return
+	}
+
+	now := carbon.Now()
+
+	updates := model.ShpOrder{
+		Status:      model.ShpOrderOfStatusReceived,
+		CompletedAt: &now,
+	}
+
+	tx := facades.Gorm.Begin()
+
+	if result := tx.Model(&order).Select("Status", "CompletedAt").Updates(updates); result.Error != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Failed to confirm order receipt. Please try again later.")
+		return
+	}
+
+	log := model.ShpLog{
+		Platform:       order.Platform,
+		CliqueID:       order.CliqueID,
+		OrganizationID: order.OrganizationID,
+		UserID:         order.UserID,
+		OrderID:        order.ID,
+		Action:         "received",
+		Content:        "User confirmed receipt.",
+		CreatedAt:      carbon.Carbon{},
+		UpdatedAt:      carbon.Carbon{},
+		DeletedAt:      gorm.DeletedAt{},
+	}
+
+	if result := tx.Create(&log); result.Error != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Failed to confirm order receipt. Please try again later.")
+		return
+	}
+
+	if err := shop.PublishOrderCompleted(order.ID); err != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Failed to confirm order receipt. Please try again later.")
+		return
+	}
+
+	tx.Commit()
+
+	http.Success[any](ctx)
+}
+
+func DoOrderOfService(c context.Context, ctx *app.RequestContext) {
+
+	var request req.DoOrderOfService
+
+	if err := ctx.BindAndValidate(&request); err != nil {
+		http.BadRequest(ctx, err)
+		return
+	}
+
+	lock := facades.Locker.NewMutex(locker.Keys("service", auth.ID(ctx)))
+
+	if err := lock.LockContext(c); err != nil {
+		http.Fail(ctx, "Order locking failed. Please try again later.")
+		return
+	}
+
+	defer lock.UnlockContext(c)
+
+	var order model.ShpOrder
+
+	fo := facades.Gorm.First(&order, "`id`=? and `user_id`=?", request.ID, auth.ID(ctx))
+
+	if errors.Is(fo.Error, gorm.ErrRecordNotFound) {
+		http.NotFound(ctx, "Order not found.")
+		return
+	} else if fo.Error != nil {
+		http.Fail(ctx, "Order query failed. Please try again later.")
+		return
+	}
+
+	if order.Status == model.ShpOrderOfStatusCompleted {
+		http.Fail(ctx, "The order has been completed, and after-sales service cannot be requested.")
+		return
+	}
+
+	if order.Status != model.ShpOrderOfStatusShipment && order.Status != model.ShpOrderOfStatusReceipt && order.Status != model.ShpOrderOfStatusReceived {
+		http.Fail(ctx, "Order status is abnormal. Please try again later.")
+		return
+	}
+
+	if order.Status == model.ShpOrderOfStatusReceived && request.Type == model.ShpServiceOfTypeUnReceipt {
+		http.Fail(ctx, "The order has been received, and a \"Not Received\" claim cannot be made.")
+		return
+	} else if order.Status != model.ShpOrderOfStatusReceived && request.Type != model.ShpServiceOfTypeUnReceipt {
+		http.Fail(ctx, "The order has not been confirmed as received. Please confirm receipt first.")
+		return
+	}
+
+	service := model.ShpService{
+		ID:             facades.Snowflake.Generate().String(),
+		Platform:       order.Platform,
+		CliqueID:       order.CliqueID,
+		OrganizationID: order.OrganizationID,
+		UserID:         order.UserID,
+		OrderID:        order.ID,
+		Type:           request.Type,
+		Status:         model.ShpServiceOfStatusPending,
+		Reason:         request.Reason,
+		Pictures:       request.Pictures,
+	}
+
+	products := make([]model.ShpServiceDetail, 0)
+
+	ids := lo.Map(request.Details, func(item req.DoOrderOfServiceWithDetail, index int) string { return item.ID })
+
+	var total int64 = 0
+
+	facades.Gorm.
+		Model(&model.ShpService{}).
+		Where("`order_id`=? and `status` NOT IN (?)", order.ID, []string{model.ShpServiceOfStatusFinish, model.ShpServiceOfStatusClosed}).
+		Where("exists (?)", facades.Gorm.
+			Model(&model.ShpServiceDetail{}).
+			Select("1").
+			Where(fmt.Sprintf("`%s`.`id`=`%s`.`service_id` and `%s`.`detail_id` IN (?)", model.TableShpService, model.TableShpServiceDetail, model.TableShpServiceDetail), ids),
+		).
+		Count(&total)
+
+	if total > 0 {
+		http.Fail(ctx, "Some orders are already being processed for after-sales service. Please do not duplicate actions.")
+		return
+	}
+
+	var details []model.ShpOrderDetail
+
+	facades.Gorm.Find(&details, "`order_id`=? and `id` IN (?)", order.ID, ids)
+
+	if len(details) != len(request.Details) {
+		http.NotFound(ctx, "Some sub-orders were not found.")
+		return
+	}
+
+	for _, item := range details {
+
+		product := model.ShpServiceDetail{
+			ID:             0,
+			Platform:       item.Platform,
+			CliqueID:       item.CliqueID,
+			OrganizationID: item.OrganizationID,
+			UserID:         item.UserID,
+			OrderID:        item.OrderID,
+			ProductID:      item.ProductID,
+			ServiceID:      service.ID,
+			DetailID:       item.ID,
+			Quantity:       0,
+			Refund:         0,
+		}
+
+		for _, val := range request.Details {
+
+			if product.DetailID == val.ID {
+				product.Quantity = val.Quantity
+				break
+			}
+		}
+
+		if product.Quantity <= 0 {
+			http.Fail(ctx, "After-sales product quantity matching failed. Please try again later.")
+			return
+		}
+
+		if product.Quantity > item.Quantity-item.Returned {
+			http.Fail(ctx, "There are not enough products available for after-sales service in the sub-order. Please check and try again.")
+			return
+		}
+
+		if request.Type == model.ShpServiceOfTypeRefund || request.Type == model.ShpServiceOfTypeUnReceipt { // 需要退款的金额
+			product.Refund = item.Price * product.Quantity
+		}
+
+		service.Subtotal += product.Refund
+
+		products = append(products, product)
+	}
+
+	service.Refunds = service.Subtotal + service.Shipping
+
+	tx := facades.Gorm.Begin()
+
+	if result := tx.Create(&products); result.Error != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Order after-sales request failed. Please try again later.")
+		return
+	}
+
+	if request.Type == model.ShpServiceOfTypeUnReceipt { // 需要退款的金额, 该次申请未收货全部商品，退还运费
+
+		total = 0
+
+		tx.
+			Model(&model.ShpOrderDetail{}).
+			Where("`order_id`=?", order.ID).
+			Where("not exists (?)", facades.Gorm.
+				Model(&model.ShpServiceDetail{}).
+				Select("1").
+				Where(fmt.Sprintf("`%s`.`id`=`%s`.`detail_id` and `%s`.`quantity`=`%s`.`quantity` and `%s`.`service_id`=?", model.TableShpOrderDetail, model.TableShpServiceDetail, model.TableShpOrderDetail, model.TableShpServiceDetail, model.TableShpServiceDetail), service.ID),
+			).Count(&total)
+
+		if total == 0 {
+			service.Shipping = order.CostShipping
+			service.Refunds += service.Shipping
+		}
+	}
+
+	if result := tx.Create(&service); result.Error != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Order after-sales request failed. Please try again later.")
+		return
+	}
+
+	log := model.ShpLog{
+		Platform:       order.Platform,
+		CliqueID:       order.CliqueID,
+		OrganizationID: order.OrganizationID,
+		UserID:         order.UserID,
+		OrderID:        order.ID,
+		DetailID:       service.DetailID,
+		ServiceID:      &service.ID,
+		Action:         "service",
+		Content:        "User requests after-sales service.",
+	}
+
+	if result := tx.Create(&log); result.Error != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Order after-sales request failed. Please try again later.")
+		return
+	}
+
+	if err := shop.PublishServiceAgree(service.ID); err != nil {
+		tx.Rollback()
+		http.Fail(ctx, "Order after-sales request failed. Please try again later.")
+		return
+	}
+
+	tx.Commit()
+
+	http.Success[any](ctx)
 }

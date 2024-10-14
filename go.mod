@@ -2,8 +2,6 @@ module project.io/shop
 
 go 1.23
 
-toolchain go1.23.2
-
 require (
 	github.com/cloudwego/hertz v0.9.3
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -15,6 +13,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/samber/lo v1.47.0
+	github.com/smartwalle/paypal v1.0.2
 	github.com/spf13/cobra v1.8.1
 	gorm.io/gorm v1.25.12
 )
@@ -101,7 +100,6 @@ require (
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/smartwalle/paypal v1.0.2 // indirect
 	github.com/smartystreets/assertions v1.1.1 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect

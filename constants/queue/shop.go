@@ -6,6 +6,7 @@ const (
 	ShopOrderPaid      = "shop_order_paid"
 	ShopOrderRefund    = "shop_order_refund"
 	ShopOrderClosed    = "shop_order_closed"
+	ShopOrderReceived  = "shop_order_received"
 	ShopOrderCompleted = "shop_order_completed"
 	ShopOrderLog       = "shop_order_log"
 
@@ -18,25 +19,25 @@ const (
 )
 
 type ShopPaymentSuccessMessage struct {
-	ID       string         `json:"id"`       // 支付ID
-	No       string         `json:"no"`       // 第三方支付单号
-	Channel  string         `json:"channel"`  // 支付渠道
-	Total    uint           `json:"total"`    // 总额
-	Payer    uint           `json:"payer"`    // 到账
-	Currency string         `json:"currency"` // 币种
-	OpenID   string         `json:"openid"`   // 用户ID
-	PaidAt   carbon.Carbon  `json:"paid_at"`  // 支付时间
+	ID       string         `json:"id"`               // 支付ID
+	No       string         `json:"no"`               // 第三方支付单号
+	Channel  string         `json:"channel"`          // 支付渠道
+	Total    uint           `json:"total"`            // 总额
+	Payer    uint           `json:"payer"`            // 到账
+	Currency string         `json:"currency"`         // 币种
+	OpenID   string         `json:"openid,omitempty"` // 用户ID
+	PaidAt   carbon.Carbon  `json:"paid_at"`          // 支付时间
 	Ext      map[string]any `json:"ext,omitempty"`
 }
 
 type ShopPaymentRefundMessage struct {
-	ID      string         `json:"id"`      // 支付ID
-	Order   string         `json:"order"`   // 订单ID
-	Service *string        `json:"service"` // 售后ID
-	Detail  *string        `json:"detail"`  // 明细ID
-	Money   uint           `json:"money"`   // 金额「为空从表中查询」
-	Reason  string         `json:"reason"`  // 退款原因
-	OpenID  *string        `json:"openid"`  // 用户ID
+	ID      string         `json:"id"`               // 支付ID
+	Order   string         `json:"order"`            // 订单ID
+	Service *string        `json:"service"`          // 售后ID
+	Detail  *string        `json:"detail"`           // 明细ID
+	Money   uint           `json:"money"`            // 金额「为空从表中查询」
+	Reason  string         `json:"reason"`           // 退款原因
+	OpenID  *string        `json:"openid,omitempty"` // 用户ID
 	Ext     map[string]any `json:"ext,omitempty"`
 }
 

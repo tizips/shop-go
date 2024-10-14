@@ -30,6 +30,8 @@ type ShpOrderAddress struct {
 	CreatedAt      carbon.Carbon  `gorm:"column:created_at;autoCreateTime"` // 创建时间
 	UpdatedAt      carbon.Carbon  `gorm:"column:updated_at;autoUpdateTime"` // 更新时间
 	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at"`                // 删除时间
+
+	Shipment *ShpShipment `gorm:"foreignKey:OrderID;references:OrderID"`
 }
 
 func (ShpOrderAddress) TableName() string {

@@ -9,7 +9,8 @@ import (
 	"github.com/herhe-com/framework/database/gorm/scope"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
-	"github.com/smartwalle/paypal"
+	"github.com/plutov/paypal/v4"
+	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"project.io/shop/model"
 	req "project.io/shop/web/http/request/shop"
@@ -26,7 +27,7 @@ func DoNotifyOfPaypal(c context.Context, ctx *app.RequestContext) {
 
 	var payment model.ShpPayment
 
-	fp := facades.Gorm.Scopes(scope.Platform(ctx)).Preload("Order").First(&payment, "`no`=? and `channel`=?", request.PaymentId, model.ShpPaymentOfChannelPaypal)
+	fp := facades.Gorm.Scopes(scope.Platform(ctx)).Preload("Order").First(&payment, "`no`=? and `channel`=?", request.Token, model.ShpPaymentOfChannelPaypal)
 
 	if errors.Is(fp.Error, gorm.ErrRecordNotFound) {
 		http.NotFound(ctx, "Order not found.")
@@ -92,9 +93,20 @@ func DoNotifyOfPaypal(c context.Context, ctx *app.RequestContext) {
 		return
 	}
 
-	client := paypal.New(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), facades.Cfg.GetBool("payment.paypal.live"))
+	base := lo.If(facades.Cfg.GetBool("payment.paypal.debug"), paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
 
-	if result, err := client.ExecuteApprovedPayment(request.PaymentId, request.PayerID); err != nil || result.State != "approved" {
+	client, err := paypal.NewClient(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), base)
+
+	if err != nil {
+		http.Fail(ctx, "Payment initiation failed. Please try again later.")
+		return
+	}
+
+	params := paypal.CaptureOrderRequest{
+		PaymentSource: &paypal.PaymentSource{},
+	}
+
+	if result, err := client.CaptureOrder(c, request.Token, params); err != nil || result.Status != "COMPLETED" {
 		tx.Rollback()
 		http.Fail(ctx, "Payment information confirmation failed. Please try again later.")
 		return

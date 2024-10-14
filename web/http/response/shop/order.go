@@ -1,6 +1,7 @@
 package shop
 
 type DoOrder struct {
+	ID      string `json:"id"`
 	PayID   string `json:"pay_id"`
 	Channel string `json:"channel"`
 }
@@ -32,6 +33,7 @@ type ToOrderOfDetail struct {
 	Specifications []string `json:"specifications,omitempty"`
 	Refund         uint     `json:"refund"`
 	Returned       uint     `json:"returned"`
+	Services       uint     `json:"services"`
 	//IsServiced     uint8    `json:"is_serviced"`
 }
 
@@ -97,7 +99,6 @@ type ToOrderOfInformation struct {
 	Remark       string             `json:"remark"`
 	IsInvoice    uint8              `json:"is_invoice"`
 	IsAppraisal  uint8              `json:"is_appraisal"`
-	CanService   uint8              `json:"can_service"`
 	CreateAt     string             `json:"create_at"`
 }
 

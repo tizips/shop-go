@@ -14,6 +14,7 @@ import (
 	"github.com/herhe-com/framework/http/middleware"
 	"github.com/herhe-com/framework/microservice/locker"
 	"github.com/herhe-com/framework/microservice/snowflake"
+	"github.com/herhe-com/framework/queue"
 	"github.com/herhe-com/framework/validation"
 	consoles2 "project.io/shop/admin/console"
 	"project.io/shop/admin/route"
@@ -36,6 +37,7 @@ func init() {
 			&snowflake.ServiceProvider{},
 			&locker.ServiceProvider{},
 			&validation.ServiceProvider{},
+			&queue.ServiceProvider{},
 			&auth.ServiceProvider{},
 			&console.ServiceProvider{},
 		},

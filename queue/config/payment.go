@@ -12,10 +12,6 @@ func init() {
 			"debug":     cfg.Env("payment.paypal.debug", false),
 			"client_id": cfg.Env("payment.paypal.client_id", ""),
 			"secret_id": cfg.Env("payment.paypal.secret_id", ""),
-			"url": map[string]any{
-				"return": cfg.Env("payment.paypal.url.return", ""),
-				"cancel": cfg.Env("payment.paypal.url.cancel", ""),
-			},
 		},
 	})
 }

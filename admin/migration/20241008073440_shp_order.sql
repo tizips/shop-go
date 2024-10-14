@@ -13,7 +13,7 @@ create table `shp_order`
     `cost_prices`     int unsigned      not null default 0 comment '成本合计',
     `prices`          int unsigned      not null default 0 comment '合计',
     `refund`          int unsigned      not null default 0 comment '退款',
-    `status`          varchar(10)       not null default '' comment '订单状态：pay=待支付；shipment=待发货；receipt=待收货；evaluate=待评价；completed=已完成；cancel=已取消；close=已关闭；refund=已退款',
+    `status`          varchar(10)       not null default '' comment '订单状态：pay=待支付；shipment=待发货；receipt=待收货；received=已收货；completed=已完成；cancel=已取消；closed=已关闭',
     `remark`          varchar(255)      not null default '' comment '备注',
     `payment_id`      varchar(64)                default null comment '支付ID',
     `is_paid`         tinyint unsigned  not null default 0 comment '是否支付：1=是；2=否',

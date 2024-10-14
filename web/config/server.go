@@ -9,6 +9,7 @@ import (
 	"github.com/herhe-com/framework/database/gorm"
 	"github.com/herhe-com/framework/database/redis"
 	"github.com/herhe-com/framework/facades"
+	"github.com/herhe-com/framework/filesystem"
 	"github.com/herhe-com/framework/http/middleware"
 	"github.com/herhe-com/framework/microservice/locker"
 	"github.com/herhe-com/framework/microservice/snowflake"
@@ -30,7 +31,7 @@ func init() {
 		"providers": []service.Provider{
 			&gorm.ServiceProvider{},
 			&redis.ServiceProvider{},
-			//&filesystem.ServiceProvider{},
+			&filesystem.ServiceProvider{},
 			&snowflake.ServiceProvider{},
 			&locker.ServiceProvider{},
 			&validation.ServiceProvider{},

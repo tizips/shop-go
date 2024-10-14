@@ -54,6 +54,18 @@ func OrderClosed() {
 	}
 }
 
+func OrderReceived() {
+
+	q := queue.NewQueue()
+
+	err := q.Consumer(doOrderReceived, constant.ShopOrderReceived, true)
+
+	if err != nil {
+		color.Errorf("[queue] shop order received: %v", err)
+		return
+	}
+}
+
 func OrderCompleted() {
 
 	q := queue.NewQueue()
@@ -90,7 +102,7 @@ func doOrderPaid(data []byte) {
 
 	if body.Order == "" {
 
-		shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
+		_ = shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
 			ID:     body.ID,
 			Reason: "No matching order found.",
 		})
@@ -113,7 +125,7 @@ func doOrderPaid(data []byte) {
 
 	if total > 0 {
 
-		shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
+		_ = shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
 			ID:     body.ID,
 			Reason: "The order has been paid for; no payment is required.",
 		})
@@ -132,7 +144,7 @@ func doOrderPaid(data []byte) {
 
 	if total > 0 {
 
-		shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
+		_ = shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
 			ID:     body.ID,
 			Reason: "The order has been closed and cannot be completed for payment.",
 		})
@@ -154,14 +166,14 @@ func doOrderPaid(data []byte) {
 		basic.PublishError(data, constant.ShopOrderPaid, result.Error)
 		return
 	} else if result.RowsAffected <= 0 {
-		shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
+		_ = shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
 			ID:     body.ID,
 			Reason: "No orders have been successfully paid.",
 		})
 		return
 	}
 
-	shop.PublishOrderLog(constant.ShopOrderLogMessage{
+	_ = shop.PublishOrderLog(constant.ShopOrderLogMessage{
 		Order:     body.Order,
 		Action:    "confirmed",
 		Content:   "Order confirmed, awaiting shipment.",
@@ -208,6 +220,10 @@ func doOrderRefund(data []byte) {
 		}
 	}
 
+	if body.Refund > 0 {
+		refund = body.Refund
+	}
+
 	if result := tx.Model(&model.ShpOrder{}).Where("`id`=?", body.ID).Update("`refund`", gorm.Expr("`refund`+?", refund)); result.Error != nil {
 		tx.Rollback()
 		basic.PublishError(data, constant.ShopOrderRefund, result.Error)
@@ -220,7 +236,13 @@ func doOrderRefund(data []byte) {
 
 	if total == 0 && order.Status != model.ShpOrderOfStatusClosed && order.Status != model.ShpOrderOfStatusCompleted { // 全额退款后，将进行中的订单手动关闭
 
-		if result := tx.Model(&model.ShpOrder{}).Where("`id`=? and `prices`<=`refund`", body.ID).Updates(map[string]any{"status": model.ShpOrderOfStatusClosed}); result.Error != nil {
+		status := model.ShpOrderOfStatusCompleted
+
+		if order.Status == model.ShpOrderOfStatusShipment {
+			status = model.ShpOrderOfStatusClosed
+		}
+
+		if result := tx.Model(&model.ShpOrder{}).Where("`id`=? and `prices`<=`refund`", order.ID).Update("status", status); result.Error != nil {
 			tx.Rollback()
 			basic.PublishError(data, constant.ShopOrderRefund, result.Error)
 			return
@@ -229,7 +251,7 @@ func doOrderRefund(data []byte) {
 
 	if order.PaymentID != nil {
 
-		shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
+		_ = shop.PublishPaymentRefund(constant.ShopPaymentRefundMessage{
 			ID:      *order.PaymentID,
 			Order:   body.ID,
 			Detail:  body.Detail,
@@ -240,7 +262,6 @@ func doOrderRefund(data []byte) {
 	}
 
 	tx.Commit()
-
 }
 
 func doOrderClosed(data []byte) {
@@ -303,6 +324,59 @@ func doOrderClosed(data []byte) {
 	tx.Commit()
 }
 
+func doOrderReceived(data []byte) {
+
+	id := string(data)
+
+	var order model.ShpOrder
+
+	fo := facades.Gorm.First(&order, "`id`=?", id)
+
+	if errors.Is(fo.Error, gorm.ErrRecordNotFound) {
+		return
+	} else if fo.Error != nil {
+		basic.PublishError(data, constant.ShopOrderReceived, fo.Error)
+		return
+	}
+
+	if order.Status != model.ShpOrderOfStatusShipment {
+		return
+	}
+
+	tx := facades.Gorm.Begin()
+
+	log := model.ShpLog{
+		Platform:       order.Platform,
+		CliqueID:       order.CliqueID,
+		OrganizationID: order.OrganizationID,
+		UserID:         order.UserID,
+		OrderID:        order.ID,
+		Action:         "received",
+		Content:        "The system has automatically confirmed receipt.",
+	}
+
+	if result := tx.Create(&log); result.Error != nil {
+		tx.Rollback()
+		basic.PublishError(data, constant.ShopOrderCompleted, result.Error)
+		return
+	}
+
+	if result := tx.Model(&order).Update("status", model.ShpOrderOfStatusReceived); result.Error != nil {
+		tx.Rollback()
+		basic.PublishError(data, constant.ShopOrderCompleted, result.Error)
+		return
+	}
+
+	if err := shop.PublishOrderCompleted(order.ID); err != nil {
+		tx.Rollback()
+		basic.PublishError(data, constant.ShopOrderCompleted, err)
+		return
+	}
+
+	tx.Commit()
+
+}
+
 func doOrderCompleted(data []byte) {
 
 	id := string(data)
@@ -331,7 +405,7 @@ func doOrderCompleted(data []byte) {
 		UserID:         order.UserID,
 		OrderID:        order.ID,
 		Action:         "completed",
-		Content:        "The system has automatically confirmed receipt.",
+		Content:        "The system has automatically completed the order.",
 	}
 
 	if result := tx.Create(&log); result.Error != nil {

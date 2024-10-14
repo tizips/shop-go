@@ -3,6 +3,7 @@ package basic
 import (
 	"context"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
 	"path/filepath"
@@ -22,14 +23,14 @@ func DoUploadOfFile(c context.Context, ctx *app.RequestContext) {
 	file, err := ctx.FormFile("file")
 
 	if err != nil {
-		http.Fail(ctx, "上传失败：%v", err)
+		http.Fail(ctx, "File upload failed. Please try again later.")
 		return
 	}
 
 	fp, err := file.Open()
 
 	if err != nil {
-		http.Fail(ctx, "文件读取失败：%v", err)
+		http.Fail(ctx, "File reading failed. Please try again later.")
 		return
 	}
 
@@ -37,7 +38,8 @@ func DoUploadOfFile(c context.Context, ctx *app.RequestContext) {
 	uri := request.Dir + "/" + filename
 
 	if err = facades.Storage.Put(uri, fp, file.Size); err != nil {
-		http.Fail(ctx, "上传失败：%v", err)
+		spew.Dump(err)
+		http.Fail(ctx, "File upload failed. Please try again later.")
 		return
 	}
 

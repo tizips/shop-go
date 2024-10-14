@@ -197,6 +197,60 @@ func shop() auth.Permission {
 		Name: "商城中心",
 		Children: []auth.Permission{
 			{
+				Code: "order",
+				Name: "订单管理",
+				Children: []auth.Permission{
+					{
+						Code: "ordinary",
+						Name: "产品订单",
+						Children: []auth.Permission{
+							{
+								Code:      "shipment",
+								Name:      "发货",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "refund",
+								Name:      "退款",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "paginate",
+								Name:      "列表",
+								Platforms: []uint16{auth.CodeOfPlatform, auth.CodeOfStore},
+							},
+						},
+					},
+					{
+						Code: "service",
+						Name: "售后订单",
+						Children: []auth.Permission{
+							{
+								Code:      "handle",
+								Name:      "处理",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "paginate",
+								Name:      "列表",
+								Platforms: []uint16{auth.CodeOfPlatform, auth.CodeOfStore},
+							},
+						},
+					},
+					{
+						Code: "appraisal",
+						Name: "订单评价",
+						Children: []auth.Permission{
+							{
+								Code:      "paginate",
+								Name:      "列表",
+								Platforms: []uint16{auth.CodeOfPlatform, auth.CodeOfStore},
+							},
+						},
+					},
+				},
+			},
+			{
 				Code: "commodity",
 				Name: "商品信息",
 				Children: []auth.Permission{
