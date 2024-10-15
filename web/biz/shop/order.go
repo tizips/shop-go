@@ -52,6 +52,18 @@ func DoOrder(c context.Context, ctx *app.RequestContext) {
 		return
 	}
 
+	var pay model.ShpPaymentChannel
+
+	fp := facades.Gorm.Scopes(scope.Platform(ctx)).First(&pay, "`id`=?", request.Payment)
+
+	if errors.Is(fp.Error, gorm.ErrRecordNotFound) {
+		http.NotFound(ctx, "No available payment channels found.")
+		return
+	} else if fp.Error != nil {
+		http.Fail(ctx, "Payment channel query failed. Please try again later.")
+		return
+	}
+
 	var carts []model.ShpCart
 
 	facades.Gorm.
@@ -230,7 +242,8 @@ func DoOrder(c context.Context, ctx *app.RequestContext) {
 		OrganizationID: order.OrganizationID,
 		UserID:         auth.ID(ctx),
 		OrderID:        order.ID,
-		Channel:        request.Payment,
+		Channel:        pay.Channel,
+		ChannelID:      pay.ID,
 		Money:          order.Prices,
 		IsConfirmed:    util.No,
 		ExpiredAt:      order.CreatedAt.AddMinutes(10),
@@ -256,7 +269,7 @@ func DoOrder(c context.Context, ctx *app.RequestContext) {
 	responses := res.DoOrder{
 		ID:      order.ID,
 		PayID:   payment.ID,
-		Channel: request.Payment,
+		Channel: pay.Channel,
 	}
 
 	http.Success(ctx, responses)

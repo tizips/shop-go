@@ -377,6 +377,43 @@ func shop() auth.Permission {
 				},
 			},
 			{
+				Code: "pay",
+				Name: "支付管理",
+				Children: []auth.Permission{
+					{
+						Code: "channel",
+						Name: "渠道配置",
+						Children: []auth.Permission{
+							{
+								Code:      "create",
+								Name:      "创建",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "update",
+								Name:      "修改",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "enable",
+								Name:      "启禁",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "delete",
+								Name:      "删除",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+							{
+								Code:      "paginate",
+								Name:      "列表",
+								Platforms: []uint16{auth.CodeOfStore},
+							},
+						},
+					},
+				},
+			},
+			{
 				Code: "basic",
 				Name: "基础配置",
 				Children: []auth.Permission{

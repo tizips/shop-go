@@ -132,12 +132,15 @@ func doPaymentRefund(data []byte) {
 
 	var payment model.ShpPayment
 
-	fp := facades.Gorm.First(&payment, "`id`=? and `is_confirmed`=?", body.ID, util.Yes)
+	fp := facades.Gorm.Preload("Channels").First(&payment, "`id`=? and `is_confirmed`=?", body.ID, util.Yes)
 
 	if errors.Is(fp.Error, gorm.ErrRecordNotFound) {
 		return
 	} else if fp.Error != nil {
 		basic.PublishError(data, constant.ShopPaymentRefund, fp.Error)
+		return
+	} else if payment.Channels == nil {
+		basic.PublishError(data, constant.ShopPaymentRefund, errors.New("no payment information found for this order"))
 		return
 	}
 
@@ -185,9 +188,9 @@ func doPaymentRefund(data []byte) {
 
 	if refund.Money > 0 && payment.Channel == model.ShpPaymentOfChannelPaypal {
 
-		base := lo.If(facades.Cfg.GetBool("payment.paypal.debug"), paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
+		base := lo.If(payment.Channels.IsDebug == util.Yes, paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
 
-		client, err := paypal.NewClient(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), base)
+		client, err := paypal.NewClient(payment.Channels.Key, payment.Channels.Secret, base)
 
 		if err != nil {
 			tx.Rollback()

@@ -29,7 +29,7 @@ func DoPageOfCreate(c context.Context, ctx *app.RequestContext) {
 
 	var total int64 = 0
 
-	facades.Gorm.Model(&model.ShpPage{}).Where("`code`=?", request.Code).Count(&total)
+	facades.Gorm.Model(&model.ShpPage{}).Scopes(scope.Platform(ctx)).Where("`code`=?", request.Code).Count(&total)
 
 	if total > 0 {
 		http.Fail(ctx, "该 Code 已被使用")

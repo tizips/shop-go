@@ -4,7 +4,7 @@ import "github.com/herhe-com/framework/contracts/http/request"
 
 type DoOrder struct {
 	Shipping   uint   `json:"shipping" form:"shipping" valid:"required,gte=0" label:"Shipping"`
-	Payment    string `json:"payment" form:"payment" valid:"required,oneof=paypal" label:"Payment"`
+	Payment    uint   `json:"payment" form:"payment" valid:"required,gt=0" label:"Payment"`
 	Coupon     string `json:"coupon" form:"coupon" valid:"omitempty,snowflake" label:"Coupon"`
 	FirstName  string `json:"first_name" form:"first_name" valid:"required,max=64" label:"FirstName"`
 	LastName   string `json:"last_name" form:"last_name" valid:"required,max=64" label:"LastName"`

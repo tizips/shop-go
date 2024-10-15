@@ -5,19 +5,41 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/herhe-com/framework/auth"
+	"github.com/herhe-com/framework/contracts/util"
 	"github.com/herhe-com/framework/database/gorm/scope"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
+	"github.com/mitchellh/mapstructure"
 	"github.com/plutov/paypal/v4"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"project.io/shop/model"
 	req "project.io/shop/web/http/request/shop"
-	"project.io/shop/web/http/response/shop"
+	res "project.io/shop/web/http/response/shop"
 	"strconv"
 	"strings"
 )
+
+func ToPaymentOfChannel(c context.Context, ctx *app.RequestContext) {
+
+	var channels []model.ShpPaymentChannel
+
+	facades.Gorm.Scopes(scope.Platform(ctx)).Order("`order` asc, `id` asc").Group("channel").Find(&channels)
+
+	responses := make([]res.ToPaymentOfChannel, len(channels))
+
+	for idx, item := range channels {
+
+		responses[idx] = res.ToPaymentOfChannel{
+			ID:      item.ID,
+			Channel: item.Channel,
+		}
+	}
+
+	http.Success(ctx, responses)
+}
 
 func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 
@@ -30,13 +52,20 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 
 	var payment model.ShpPayment
 
-	fp := facades.Gorm.Scopes(scope.Platform(ctx)).Preload("Order").First(&payment, "`id`=? and `channel`=? and `user_id`=?", request.ID, model.ShpPaymentOfChannelPaypal, auth.ID(ctx))
+	fp := facades.Gorm.
+		Scopes(scope.Platform(ctx)).
+		Preload("Order").
+		Preload("Channels").
+		First(&payment, "`id`=? and `channel`=? and `user_id`=?", request.ID, model.ShpPaymentOfChannelPaypal, auth.ID(ctx))
 
 	if errors.Is(fp.Error, gorm.ErrRecordNotFound) {
 		http.NotFound(ctx, "Order not found.")
 		return
 	} else if fp.Error != nil || payment.Order == nil {
 		http.Fail(ctx, "Order query failed. Please try again later.")
+		return
+	} else if payment.Channels == nil {
+		http.Fail(ctx, "No payment information found for this order.")
 		return
 	}
 
@@ -48,11 +77,19 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 
 	facades.Gorm.Scopes(scope.Platform(ctx)).Find(&details, "`order_id`=?", payment.OrderID)
 
-	base := lo.If(facades.Cfg.GetBool("payment.paypal.debug"), paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
+	base := lo.If(payment.Channels.IsDebug == util.Yes, paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
 
-	client, err := paypal.NewClient(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), base)
+	client, err := paypal.NewClient(payment.Channels.Key, payment.Channels.Secret, base)
 
 	if err != nil {
+		http.Fail(ctx, "Payment initiation failed. Please try again later.")
+		return
+	}
+
+	var ext model.ShpPaymentChannelOfExtPayPal
+
+	if err = mapstructure.Decode(payment.Channels.Ext, &ext); err != nil {
+		spew.Dump(err)
 		http.Fail(ctx, "Payment initiation failed. Please try again later.")
 		return
 	}
@@ -93,13 +130,13 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 		Paypal: &paypal.PaymentSourcePaypal{
 			ExperienceContext: paypal.PaymentSourcePaypalExperienceContext{
 				PaymentMethodPreference: "UNRESTRICTED",
-				BrandName:               facades.Cfg.GetString("app.title"),
+				BrandName:               payment.Channels.Name,
 				Locale:                  "en-US",
 				LandingPage:             "LOGIN",
 				ShippingPreference:      "NO_SHIPPING",
 				UserAction:              "PAY_NOW",
-				ReturnURL:               facades.Cfg.GetString("payment.paypal.url.return"),
-				CancelURL:               facades.Cfg.GetString("payment.paypal.url.cancel"),
+				ReturnURL:               ext.URL.Return,
+				CancelURL:               ext.URL.Cancel,
 			},
 		},
 	}
@@ -108,6 +145,7 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 	order, err := client.CreateOrder(c, paypal.OrderIntentCapture, units, source, appCtx)
 
 	if err != nil {
+		spew.Dump(err)
 		http.Fail(ctx, "Payment initiation failed. Please try again later.")
 		return
 	}
@@ -122,7 +160,7 @@ func DoPaymentOfPaypal(c context.Context, ctx *app.RequestContext) {
 		return
 	}
 
-	responses := shop.DoPaymentOfPaypal{}
+	responses := res.DoPaymentOfPaypal{}
 
 	for _, item := range order.Links {
 		if item.Rel == "payer-action" {

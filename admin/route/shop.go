@@ -4,10 +4,12 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/herhe-com/framework/http/middleware"
 	mBasic "project.io/shop/admin/biz/shop/common/basic"
+	pOrder "project.io/shop/admin/biz/shop/platform/order"
 	sBasic "project.io/shop/admin/biz/shop/store/basic"
 	sCommodity "project.io/shop/admin/biz/shop/store/commodity"
 	sMember "project.io/shop/admin/biz/shop/store/member"
 	sOrder "project.io/shop/admin/biz/shop/store/order"
+	sPay "project.io/shop/admin/biz/shop/store/pay"
 )
 
 func ShopRouter(router *server.Hertz) {
@@ -32,9 +34,37 @@ func ShopRouter(router *server.Hertz) {
 			}
 		}
 
-		//pla := route.Group("platform")
-		//{
-		//}
+		pla := route.Group("platform")
+		{
+			order := pla.Group("order")
+			{
+				ordinaries := order.Group("ordinaries")
+				{
+					ordinaries.GET(":id", pOrder.ToOrdinaryOfInformation)
+					ordinaries.GET("", middleware.Permission("shop.order.ordinary.paginate"), pOrder.ToOrdinaryOfPaginate)
+				}
+
+				ordinary := order.Group("ordinary")
+				{
+					ordinary.GET("logs", pOrder.ToOrdinaryOfLogs)
+				}
+
+				services := order.Group("services")
+				{
+					services.GET("", middleware.Permission("shop.order.service.paginate"), pOrder.ToServiceOfPaginate)
+				}
+
+				service := order.Group("service")
+				{
+					service.GET("logs", pOrder.ToServiceOfLogs)
+				}
+
+				appraisals := order.Group("appraisals")
+				{
+					appraisals.GET("", middleware.Permission("shop.order.appraisal.paginate"), pOrder.ToAppraisalOfPaginate)
+				}
+			}
+		}
 
 		//clq := route.Group("clique")
 		//{
@@ -134,6 +164,23 @@ func ShopRouter(router *server.Hertz) {
 				users := member.Group("users")
 				{
 					users.GET("", middleware.Permission("shop.member.user.paginate"), sMember.ToUserOfPaginate)
+				}
+			}
+
+			pay := sto.Group("pay")
+			{
+				channels := pay.Group("channels")
+				{
+					channels.GET("", middleware.Permission("shop.pay.channel.paginate"), sPay.ToChannelOfPaginate)
+					channels.GET(":id", middleware.Permission("shop.pay.channel.paginate"), sPay.ToChannelOfInformation)
+					channels.PUT(":id", middleware.Permission("shop.pay.channel.update"), sPay.DoChannelOfUpdate)
+					channels.DELETE(":id", middleware.Permission("shop.pay.channel.delete"), sPay.DoChannelOfDelete)
+				}
+
+				channel := pay.Group("channel")
+				{
+					channel.POST("", middleware.Permission("shop.pay.channel.create"), sPay.DoChannelOfCreate)
+					channel.PUT("enable", middleware.Permission("shop.pay.channel.enable"), sPay.DoChannelOfEnable)
 				}
 			}
 

@@ -26,7 +26,7 @@ func DoSEOOfCreate(c context.Context, ctx *app.RequestContext) {
 
 	var total int64 = 0
 
-	facades.Gorm.Model(&model.ShpSEO{}).Where("`channel`=? and `channel_id`=?", model.ShpSEOForChannelOfCategory, request.Code).Count(&total)
+	facades.Gorm.Model(&model.ShpSEO{}).Scopes(scope.Platform(ctx)).Where("`channel`=? and `channel_id`=?", model.ShpSEOForChannelOfCategory, request.Code).Count(&total)
 
 	if total > 0 {
 		http.Fail(ctx, "该 Code 已被使用")

@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 	"project.io/shop/model"
 	req "project.io/shop/web/http/request/shop"
+	res "project.io/shop/web/http/response/shop"
 )
 
 func DoNotifyOfPaypal(c context.Context, ctx *app.RequestContext) {
@@ -27,13 +28,20 @@ func DoNotifyOfPaypal(c context.Context, ctx *app.RequestContext) {
 
 	var payment model.ShpPayment
 
-	fp := facades.Gorm.Scopes(scope.Platform(ctx)).Preload("Order").First(&payment, "`no`=? and `channel`=?", request.Token, model.ShpPaymentOfChannelPaypal)
+	fp := facades.Gorm.
+		Scopes(scope.Platform(ctx)).
+		Preload("Order").
+		Preload("Channels").
+		First(&payment, "`no`=? and `channel`=?", request.Token, model.ShpPaymentOfChannelPaypal)
 
 	if errors.Is(fp.Error, gorm.ErrRecordNotFound) {
 		http.NotFound(ctx, "Order not found.")
 		return
 	} else if fp.Error != nil || payment.Order == nil {
 		http.Fail(ctx, "Order query failed. Please try again later.")
+		return
+	} else if payment.Channels == nil {
+		http.Fail(ctx, "No payment information found for this order.")
 		return
 	}
 
@@ -93,9 +101,9 @@ func DoNotifyOfPaypal(c context.Context, ctx *app.RequestContext) {
 		return
 	}
 
-	base := lo.If(facades.Cfg.GetBool("payment.paypal.debug"), paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
+	base := lo.If(payment.Channels.IsDebug == util.Yes, paypal.APIBaseSandBox).Else(paypal.APIBaseLive)
 
-	client, err := paypal.NewClient(facades.Cfg.GetString("payment.paypal.client_id"), facades.Cfg.GetString("payment.paypal.secret_id"), base)
+	client, err := paypal.NewClient(payment.Channels.Key, payment.Channels.Secret, base)
 
 	if err != nil {
 		http.Fail(ctx, "Payment initiation failed. Please try again later.")
@@ -114,5 +122,9 @@ func DoNotifyOfPaypal(c context.Context, ctx *app.RequestContext) {
 
 	tx.Commit()
 
-	http.Success[any](ctx)
+	responses := res.DoNotifyOfPaypal{
+		Order: payment.OrderID,
+	}
+
+	http.Success(ctx, responses)
 }

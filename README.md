@@ -23,6 +23,7 @@ docker run \
   --net uper \
   --ip 172.19.0.115 \
   -v $PWD/conf:/app/conf \
+  -v $PWD/migration:/app/migration \
   herhe/admin:1.0.0
 ```
 

@@ -76,6 +76,7 @@ func ShopRouter(router *server.Hertz) {
 
 		payment := route.Group("payment").Use(middleware.Auth())
 		{
+			payment.GET("channel", shop.ToPaymentOfChannel)
 			payment.POST("paypal", shop.DoPaymentOfPaypal)
 		}
 

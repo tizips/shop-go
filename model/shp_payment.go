@@ -18,6 +18,7 @@ type ShpPayment struct {
 	OrderID        string         `gorm:"column:order_id;index"`            // 订单ID
 	No             *string        `gorm:"column:no;index"`                  // 第三方支付单号
 	Channel        string         `gorm:"column:channel"`                   // 支付渠道：paypal=贝宝
+	ChannelID      uint           `gorm:"column:channel_id"`                // 渠道ID
 	Money          uint           `gorm:"column:money"`                     // 价格
 	Currency       string         `gorm:"column:currency"`                  // 币种
 	IsConfirmed    uint8          `gorm:"column:is_confirmed"`              // 是否确认：1=是；2=否
@@ -29,7 +30,8 @@ type ShpPayment struct {
 	UpdatedAt      carbon.Carbon  `gorm:"column:updated_at;autoUpdateTime"` // 更新时间
 	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at"`                // 删除时间
 
-	Order *ShpOrder `gorm:"foreignKey:ID;references:OrderID"`
+	Order    *ShpOrder          `gorm:"foreignKey:ID;references:OrderID"`
+	Channels *ShpPaymentChannel `gorm:"foreignKey:ID;references:ChannelID"`
 }
 
 func (ShpPayment) TableName() string {
