@@ -30,7 +30,7 @@ func ToProductOfPaginate(c context.Context, ctx *app.RequestContext) {
 		Page: request.GetPage(),
 	}
 
-	tx := facades.Gorm.WithContext(c).Where("`is_enable`=?", util.Yes)
+	tx := facades.Gorm.WithContext(c).Scopes(scope.Platform(ctx)).Where("`is_enable`=?", util.Yes)
 
 	if request.Category > 0 {
 		tx = tx.Where("`i1_category_id`=? or `i2_category_id`=? or `i3_category_id`=?", request.Category, request.Category, request.Category)
@@ -80,6 +80,7 @@ func ToProductOfHot(c context.Context, ctx *app.RequestContext) {
 
 	facades.Gorm.
 		WithContext(c).
+		Scopes(scope.Platform(ctx)).
 		Where("`is_hot`=?", util.Yes).
 		Where("`is_enable`=?", util.Yes).
 		Preload("Picture", func(t *gorm.DB) *gorm.DB { return t.Where("`is_default`=?", util.Yes) }).
@@ -117,6 +118,7 @@ func ToProductOfRecommended(c context.Context, ctx *app.RequestContext) {
 
 	facades.Gorm.
 		WithContext(c).
+		Scopes(scope.Platform(ctx)).
 		Where("`is_recommend`=?", util.Yes).
 		Where("`is_enable`=?", util.Yes).
 		Preload("Picture", func(t *gorm.DB) *gorm.DB { return t.Where("`is_default`=?", util.Yes) }).
