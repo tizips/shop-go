@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/herhe-com/framework/database/gorm/scope"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
 	"gorm.io/gorm"
@@ -23,7 +24,7 @@ func ToPage(c context.Context, ctx *app.RequestContext) {
 
 	var page model.ShpPage
 
-	fp := facades.Gorm.First(&page, "`code`=?", request.Code)
+	fp := facades.Gorm.Scopes(scope.Platform(ctx)).First(&page, "`code`=?", request.Code)
 
 	if errors.Is(fp.Error, gorm.ErrRecordNotFound) {
 		http.NotFound(ctx, "未找到该页面信息")
