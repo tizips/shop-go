@@ -3,6 +3,7 @@ package shop
 import (
 	"context"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/herhe-com/framework/contracts/util"
 	"github.com/herhe-com/framework/database/gorm/scope"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
@@ -26,7 +27,7 @@ func ToAdvertises(c context.Context, ctx *app.RequestContext) {
 		WithContext(c).
 		Scopes(scope.Platform(ctx)).
 		Order("`order` asc, `id` asc").
-		Find(&advertises, "`page`=? and `block`=?", request.Page, request.Block)
+		Find(&advertises, "`page`=? and `block`=? and `is_enable`=?", request.Page, request.Block, util.Yes)
 
 	responses := make([]res.ToAdvertises, len(advertises))
 
