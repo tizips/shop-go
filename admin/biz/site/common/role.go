@@ -34,7 +34,9 @@ func ToRoleByPaginate(c context.Context, ctx *app.RequestContext) {
 		Size: request.GetSize(),
 	}
 
-	tx := facades.Gorm.WithContext(c).
+	tx := facades.Gorm.
+		WithContext(c).
+		Scopes(scope.Platform(ctx)).
 		Where("`id`<>?", authConstants.CodeOfDeveloper)
 
 	tx.Model(&model.SysRole{}).Count(&responses.Total)
@@ -70,7 +72,7 @@ func ToRoleByInformation(c context.Context, ctx *app.RequestContext) {
 
 	var role model.SysRole
 
-	fr := facades.Gorm.Preload("BindPermissions").First(&role, "`id`=?", id)
+	fr := facades.Gorm.Scopes(scope.Platform(ctx)).Preload("BindPermissions").First(&role, "`id`=?", id)
 	if errors.Is(fr.Error, gorm.ErrRecordNotFound) {
 		http.NotFound(ctx, "未找到该数据")
 		return
@@ -398,7 +400,7 @@ func DoRoleByDelete(c context.Context, ctx *app.RequestContext) {
 
 	var role model.SysRole
 
-	fr := facades.Gorm.Preload("BindPermissions").First(&role, "`id`=?", id)
+	fr := facades.Gorm.Scopes(scope.Platform(ctx)).Preload("BindPermissions").First(&role, "`id`=?", id)
 	if errors.Is(fr.Error, gorm.ErrRecordNotFound) {
 		http.NotFound(ctx, "未找到该数据")
 		return
@@ -436,7 +438,7 @@ func ToRoleByOpening(c context.Context, ctx *app.RequestContext) {
 
 	var roles []model.SysRole
 
-	tx := facades.Gorm.WithContext(c)
+	tx := facades.Gorm.WithContext(c).Scopes(scope.Platform(ctx))
 
 	if ok, _ := facades.Casbin.HasRoleForUser(auth.NameOfUser(auth.ID(ctx)), auth.NameOfDeveloper()); !ok {
 		tx.Where("`id`<>?", authConstants.CodeOfDeveloper)

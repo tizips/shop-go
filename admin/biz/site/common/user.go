@@ -52,7 +52,7 @@ func ToUserByPaginate(c context.Context, ctx *app.RequestContext) {
 		var roles []model.SysUser
 
 		tx.
-			Preload("BindRoles.Role").
+			Preload("BindRoles", func(t *gorm.DB) *gorm.DB { return t.Preload("Role").Scopes(scope.Platform(ctx)) }).
 			Offset(request.GetOffset()).
 			Limit(request.GetLimit()).
 			Order("`id` desc").
@@ -108,7 +108,7 @@ func DoUserByCreate(c context.Context, ctx *app.RequestContext) {
 
 	var total int64 = 0
 
-	vr := facades.Gorm.WithContext(context.Background()).Where("`id` IN (?)", request.Roles)
+	vr := facades.Gorm.WithContext(c).Scopes(scope.Platform(ctx)).Where("`id` IN (?)", request.Roles)
 
 	if ok, _ := facades.Casbin.HasRoleForUser(auth.NameOfUser(auth.ID(ctx)), auth.NameOfDeveloper()); !ok {
 		vr = vr.Where("`id`<>?", authConstants.CodeOfDeveloper)
@@ -191,7 +191,7 @@ func DoUserByUpdate(c context.Context, ctx *app.RequestContext) {
 	var user model.SysUser
 
 	fu := facades.Gorm.
-		Preload("BindRoles.Role").
+		Preload("BindRoles", func(t *gorm.DB) *gorm.DB { return t.Preload("Role").Scopes(scope.Platform(ctx)) }).
 		Where("exists (?)", facades.Gorm.
 			Select("1").
 			Model(model.SysUserBindRole{}).
