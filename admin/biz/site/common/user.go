@@ -9,6 +9,7 @@ import (
 	authConstants "github.com/herhe-com/framework/contracts/auth"
 	"github.com/herhe-com/framework/contracts/http/response"
 	"github.com/herhe-com/framework/contracts/util"
+	"github.com/herhe-com/framework/database/gorm/scope"
 	"github.com/herhe-com/framework/facades"
 	"github.com/herhe-com/framework/http"
 	"gorm.io/gorm"
@@ -33,6 +34,7 @@ func ToUserByPaginate(c context.Context, ctx *app.RequestContext) {
 	}
 
 	ter := facades.Gorm.WithContext(context.Background()).
+		Scopes(scope.Platform(ctx)).
 		Select("1").
 		Model(&model.SysUserBindRole{}).
 		Where(fmt.Sprintf("`%s`.`id`=`%s`.`user_id`", model.TableSysUser, model.TableSysUserBindRole))
